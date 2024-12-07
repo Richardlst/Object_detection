@@ -1,8 +1,10 @@
 package com.example.imagepro;
 
+import android.content.Context;
 import android.content.res.AssetFileDescriptor;
 import android.content.res.AssetManager;
 import android.graphics.Bitmap;
+import android.speech.tts.TextToSpeech;
 
 import org.checkerframework.checker.units.qual.A;
 import org.opencv.android.Utils;
@@ -25,6 +27,7 @@ import java.nio.ByteOrder;
 import java.nio.channels.FileChannel;
 import java.util.ArrayList;
 import java.util.List;
+import java.util.Locale;
 import java.util.Map;
 import java.util.TreeMap;
 
@@ -43,9 +46,13 @@ public class objectDetectorClass {
     private GpuDelegate gpuDelegate;
     private int height=0;
     private  int width=0;
+    private TextToSpeech textToSpeech;
+    private List<String> detectedObjects;
+    private long lastDetectedTime = 0;
 
-    objectDetectorClass(AssetManager assetManager,String modelPath, String labelPath,int inputSize) throws IOException{
+    objectDetectorClass(AssetManager assetManager, String modelPath, String labelPath, int inputSize, Context context) throws IOException{
         INPUT_SIZE=inputSize;
+        detectedObjects = new ArrayList<>();
         // use to define gpu or cpu // no. of threads
         Interpreter.Options options=new Interpreter.Options();
         gpuDelegate=new GpuDelegate();
@@ -55,7 +62,15 @@ public class objectDetectorClass {
         interpreter=new Interpreter(loadModelFile(assetManager,modelPath),options);
         // load labelmap
         labelList=loadLabelList(assetManager,labelPath);
-
+        // Khởi tạo Text-to-Speech
+        textToSpeech = new TextToSpeech(context, new TextToSpeech.OnInitListener() {
+            @Override
+            public void onInit(int status) {
+                if (status == TextToSpeech.SUCCESS) {
+                    textToSpeech.setLanguage(Locale.US); // Đặt ngôn ngữ cho TTS
+                }
+            }
+        });
 
     }
 
@@ -86,6 +101,7 @@ public class objectDetectorClass {
     // create new Mat function
     public Mat recognizeImage(Mat mat_image){
         // Rotate original image by 90 degree get get portrait frame
+        detectedObjects.clear();
         Mat rotated_mat_image=new Mat();
         Core.flip(mat_image.t(),rotated_mat_image,1);
         // if you do not do this process you will get improper prediction, less no. of object
@@ -157,6 +173,23 @@ public class objectDetectorClass {
                 // write text on frame
                                                 // string of class name of object  // starting point                         // color of text           // size of text
                 Imgproc.putText(rotated_mat_image,labelList.get((int) class_value),new Point(left,top),3,1,new Scalar(255, 0, 0, 255),2);
+                String objectName = labelList.get((int) class_value);
+                long currentTime = System.currentTimeMillis();
+//                if (!detectedObjects.contains(objectName)) {
+//                    detectedObjects.add(objectName);
+//                }
+//                // Phát âm tên đối tượng
+//                textToSpeech.speak(objectName, TextToSpeech.QUEUE_ADD, null, null);
+                if (!detectedObjects.contains(objectName) && (currentTime - lastDetectedTime >= 1500)) {
+                    // Cập nhật thời gian cuối
+                    lastDetectedTime = currentTime;
+
+                    // Thêm đối tượng vào danh sách
+                    detectedObjects.add(objectName);
+
+                    // Phát âm tên đối tượng
+                    textToSpeech.speak(objectName, TextToSpeech.QUEUE_FLUSH, null, null);
+                }
             }
 
         }
@@ -205,6 +238,17 @@ public class objectDetectorClass {
         }
     return byteBuffer;
     }
+    public void releaseResources() {
+        if (textToSpeech != null) {
+            textToSpeech.stop();
+            textToSpeech.shutdown();
+        }
+    }
+    public String getDetectedObjects() {
+        if (detectedObjects.isEmpty()) {
+            return "nothing";
+        }
+        return String.join(", ", detectedObjects);
+    }
+
 }
-// Next video is about drawing box and labeling it
-// If you have any problem please inform me

@@ -87,10 +87,11 @@ public class CameraActivity extends Activity implements CameraBridgeViewBase.CvC
     }
     private void processVoiceCommand(String command) {
         command = command.toLowerCase().trim();
-        if (command.contains("describe surrounding")) {
+        if (command.contains("describe")) {
             describeSurrounding();
         } else {
-            textToSpeech.speak("Command not recognized", TextToSpeech.QUEUE_FLUSH, null, null);
+            describeSurrounding();
+            //textToSpeech.speak("Command not recognized", TextToSpeech.QUEUE_FLUSH, null, null);
         }
     }
     private void startListening() {
@@ -155,16 +156,11 @@ public class CameraActivity extends Activity implements CameraBridgeViewBase.CvC
         voice_button.setOnClickListener(new View.OnClickListener() {
             @Override
             public void onClick(View v) {
-                // Kiểm tra trạng thái thu âm, nếu chưa thu âm thì bắt đầu, nếu đang thu âm thì dừng
-                if (isListening) {
-                    stopListening();  // Dừng thu âm
-                    voice_button.setText("Start Listening");  // Đổi tên nút
-                } else {
-                    startListening();  // Bắt đầu thu âm
-                    voice_button.setText("Stop Listening");  // Đổi tên nút
-                }
+               describeSurrounding();
             }
         });
+
+
         // Khởi tạo TextToSpeech
         textToSpeech = new TextToSpeech(this, status -> {
             if (status == TextToSpeech.SUCCESS) {
@@ -187,7 +183,9 @@ public class CameraActivity extends Activity implements CameraBridgeViewBase.CvC
     // Nhận kết quả từ Google Speech Recognition
     private void describeSurrounding() {
         String detectedObjects = objectDetectorClass.getDetectedObjects(); // Hàm cần được triển khai
+        System.out.println(detectedObjects);
         textToSpeech.speak("I see " + detectedObjects, TextToSpeech.QUEUE_FLUSH, null, null);
+        objectDetectorClass.clearDetectedObjects();
     }
 
     @Override

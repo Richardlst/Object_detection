@@ -52,4 +52,6 @@ dependencies {
     testImplementation 'junit:junit:4.+'
     androidTestImplementation 'androidx.test.ext:junit:1.1.2'
     androidTestImplementation 'androidx.test.espresso:espresso-core:3.3.0'
+    // https://mvnrepository.com/artifact/com.microsoft.cognitiveservices.speech/client-sdk
+    implementation group: 'com.microsoft.cognitiveservices.speech', name: 'client-sdk', version: '1.41.1'
 }

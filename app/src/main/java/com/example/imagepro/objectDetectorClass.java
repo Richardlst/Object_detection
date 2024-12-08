@@ -26,13 +26,16 @@ import java.nio.ByteBuffer;
 import java.nio.ByteOrder;
 import java.nio.channels.FileChannel;
 import java.util.ArrayList;
+import java.util.HashSet;
 import java.util.List;
 import java.util.Locale;
 import java.util.Map;
+import java.util.Set;
 import java.util.TreeMap;
 
 public class objectDetectorClass {
     // should start from small letter
+    private Set<String> spokenObjects = new HashSet<>();
 
     // this is used to load model and predict
     private Interpreter interpreter;
@@ -49,7 +52,8 @@ public class objectDetectorClass {
     private TextToSpeech textToSpeech;
     private List<String> detectedObjects;
     private long lastDetectedTime = 0;
-
+    private long currentTime = System.currentTimeMillis();
+    private String objectName;
     objectDetectorClass(AssetManager assetManager, String modelPath, String labelPath, int inputSize, Context context) throws IOException{
         INPUT_SIZE=inputSize;
         detectedObjects = new ArrayList<>();
@@ -101,7 +105,7 @@ public class objectDetectorClass {
     // create new Mat function
     public Mat recognizeImage(Mat mat_image){
         // Rotate original image by 90 degree get get portrait frame
-        detectedObjects.clear();
+//        detectedObjects.clear();
         Mat rotated_mat_image=new Mat();
         Core.flip(mat_image.t(),rotated_mat_image,1);
         // if you do not do this process you will get improper prediction, less no. of object
@@ -173,11 +177,11 @@ public class objectDetectorClass {
                 // write text on frame
                                                 // string of class name of object  // starting point                         // color of text           // size of text
                 Imgproc.putText(rotated_mat_image,labelList.get((int) class_value),new Point(left,top),3,1,new Scalar(255, 0, 0, 255),2);
-                String objectName = labelList.get((int) class_value);
-                long currentTime = System.currentTimeMillis();
-//                if (!detectedObjects.contains(objectName)) {
-//                    detectedObjects.add(objectName);
-//                }
+                objectName = labelList.get((int) class_value);
+
+                if (!detectedObjects.contains(objectName)) {
+                    detectedObjects.add(objectName);
+                }
 //                // Phát âm tên đối tượng
 //                textToSpeech.speak(objectName, TextToSpeech.QUEUE_ADD, null, null);
                 if (!detectedObjects.contains(objectName) && (currentTime - lastDetectedTime >= 1500)) {
@@ -188,7 +192,14 @@ public class objectDetectorClass {
                     detectedObjects.add(objectName);
 
                     // Phát âm tên đối tượng
-                    textToSpeech.speak(objectName, TextToSpeech.QUEUE_FLUSH, null, null);
+                    if (!spokenObjects.contains(objectName)) {
+                        // Phát âm tên đối tượng
+                        textToSpeech.speak(objectName, TextToSpeech.QUEUE_FLUSH, null, null);
+
+                        // Thêm đối tượng vào Set đã phát âm
+                        spokenObjects.add(objectName);
+                    }
+//                    textToSpeech.speak(objectName, TextToSpeech.QUEUE_FLUSH, null, null);
                 }
             }
 
@@ -200,6 +211,12 @@ public class objectDetectorClass {
         return mat_image;
     }
 
+    public String getDetectedObjects() {
+        if (detectedObjects.isEmpty()) {
+            return "nothing";
+        }
+        return String.join(", ", detectedObjects);
+    }
     private ByteBuffer convertBitmapToByteBuffer(Bitmap bitmap) {
         ByteBuffer byteBuffer;
         // some model input should be quant=0  for some quant=1
@@ -238,17 +255,15 @@ public class objectDetectorClass {
         }
     return byteBuffer;
     }
+    public void clearDetectedObjects() {
+        detectedObjects.clear();
+    }
     public void releaseResources() {
         if (textToSpeech != null) {
             textToSpeech.stop();
             textToSpeech.shutdown();
         }
     }
-    public String getDetectedObjects() {
-        if (detectedObjects.isEmpty()) {
-            return "nothing";
-        }
-        return String.join(", ", detectedObjects);
-    }
+
 
 }

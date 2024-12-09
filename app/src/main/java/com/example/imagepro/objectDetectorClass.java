@@ -5,6 +5,7 @@ import android.content.res.AssetFileDescriptor;
 import android.content.res.AssetManager;
 import android.graphics.Bitmap;
 import android.speech.tts.TextToSpeech;
+import android.util.Log;
 
 import org.checkerframework.checker.units.qual.A;
 import org.opencv.android.Utils;
@@ -36,7 +37,7 @@ import java.util.TreeMap;
 public class objectDetectorClass {
     // should start from small letter
     private Set<String> spokenObjects = new HashSet<>();
-
+    private Set<String> warnedObjects = new HashSet<>();
     // this is used to load model and predict
     private Interpreter interpreter;
     // store all label in array
@@ -49,11 +50,48 @@ public class objectDetectorClass {
     private GpuDelegate gpuDelegate;
     private int height=0;
     private  int width=0;
-    private TextToSpeech textToSpeech;
+    private TextToSpeech textToSpeech1;
     private List<String> detectedObjects;
     private long lastDetectedTime = 0;
     private long currentTime = System.currentTimeMillis();
     private String objectName;
+    private final double initDistance = 30;
+    private final double initWidthBottle = 71;
+    private final double initWidthMouse = 76;
+    private final double initWidthPhone = 103;
+    private final double initWidthCup = 50;
+    private final double initWidthTable = 271;
+    private final double initWidthLaptop = 711;
+    private final double initWidthKeyboard = 191;
+    private double distance(double curWidth, String label) {
+        double curInit= 1;
+        switch(label) {
+            case "mouse":
+                curInit = initWidthMouse;
+                break;
+            case "bottle":
+                curInit = initWidthBottle;
+                break;
+            case "cell phone":
+                curInit = initWidthPhone;
+                break;
+            case "cup":
+                curInit = initWidthCup;
+                break;
+            case "dining table":
+                curInit = initWidthTable;
+                break;
+            case "laptop":
+                curInit = initWidthLaptop;
+                break;
+            case "keyboard":
+                curInit = initWidthKeyboard;
+                break;
+            default:
+
+        }
+        return initDistance * curInit / curWidth;
+    }
     objectDetectorClass(AssetManager assetManager, String modelPath, String labelPath, int inputSize, Context context) throws IOException{
         INPUT_SIZE=inputSize;
         detectedObjects = new ArrayList<>();
@@ -67,11 +105,11 @@ public class objectDetectorClass {
         // load labelmap
         labelList=loadLabelList(assetManager,labelPath);
         // Khởi tạo Text-to-Speech
-        textToSpeech = new TextToSpeech(context, new TextToSpeech.OnInitListener() {
+        textToSpeech1 = new TextToSpeech(context, new TextToSpeech.OnInitListener() {
             @Override
             public void onInit(int status) {
                 if (status == TextToSpeech.SUCCESS) {
-                    textToSpeech.setLanguage(Locale.US); // Đặt ngôn ngữ cho TTS
+                    textToSpeech1.setLanguage(Locale.US); // Đặt ngôn ngữ cho TTS
                 }
             }
         });
@@ -174,33 +212,49 @@ public class objectDetectorClass {
                 float right=(float) Array.get(box1,3)*width;
                 // draw rectangle in Original frame //  starting point    // ending point of box  // color of box       thickness
                 Imgproc.rectangle(rotated_mat_image,new Point(left,top),new Point(right,bottom),new Scalar(0, 255, 0, 255),2);
+                double dis = distance(Math.min(right - left, bottom - top), labelList.get((int) class_value));
                 // write text on frame
                                                 // string of class name of object  // starting point                         // color of text           // size of text
-                Imgproc.putText(rotated_mat_image,labelList.get((int) class_value),new Point(left,top),3,1,new Scalar(255, 0, 0, 255),2);
+                Imgproc.putText(rotated_mat_image,labelList.get((int) class_value)+" "+ String.format("%.2f", dis)+"cm",new Point(left,top),3,1,new Scalar(255, 0, 0, 255),2);
                 objectName = labelList.get((int) class_value);
-
-                if (!detectedObjects.contains(objectName)) {
-                    detectedObjects.add(objectName);
-                }
-//                // Phát âm tên đối tượng
-//                textToSpeech.speak(objectName, TextToSpeech.QUEUE_ADD, null, null);
-                if (!detectedObjects.contains(objectName) && (currentTime - lastDetectedTime >= 1500)) {
-                    // Cập nhật thời gian cuối
-                    lastDetectedTime = currentTime;
-
-                    // Thêm đối tượng vào danh sách
-                    detectedObjects.add(objectName);
-
-                    // Phát âm tên đối tượng
-                    if (!spokenObjects.contains(objectName)) {
-                        // Phát âm tên đối tượng
-                        textToSpeech.speak(objectName, TextToSpeech.QUEUE_FLUSH, null, null);
-
-                        // Thêm đối tượng vào Set đã phát âm
-                        spokenObjects.add(objectName);
+                Log.d("DEBUG_TAG", "Detected Objectname: " + objectName);
+                if(CameraActivity.get_button_state()) {
+                    if (!detectedObjects.contains(objectName)) {
+                        detectedObjects.add(objectName);
                     }
-//                    textToSpeech.speak(objectName, TextToSpeech.QUEUE_FLUSH, null, null);
+                    CameraActivity.set_button_state(false);
                 }
+                if (dis < 50 && !warnedObjects.contains(objectName)
+                        && !objectName.equals("cat")
+                        && !objectName.equals("dog")
+                        && !objectName.equals("train")
+                        && !objectName.equals("couch")
+                        && !objectName.equals("base")
+                        && !objectName.equals("umbrella")
+                        && !objectName.equals("tv")
+                        && !objectName.equals("bed"))  {
+                    warnedObjects.add(objectName); // Đánh dấu là đã cảnh báo
+                    textToSpeech1.speak("Warning " + objectName, TextToSpeech.QUEUE_ADD, null, null);
+                }
+
+//                textToSpeech.speak(objectName, TextToSpeech.QUEUE_ADD, null, null);
+//                if (!detectedObjects.contains(objectName) ) {
+//                    // Cập nhật thời gian cuối
+////                    lastDetectedTime = currentTime;
+//
+////                     Thêm đối tượng vào danh sách
+//                    detectedObjects.add(objectName);
+//
+////                    // Phát âm tên đối tượng
+////                    if (!spokenObjects.contains(objectName)) {
+////                        // Phát âm tên đối tượng
+////                        textToSpeech.speak(objectName, TextToSpeech.QUEUE_FLUSH, null, null);
+////
+////                        // Thêm đối tượng vào Set đã phát âm
+////                        spokenObjects.add(objectName);
+////                    }
+////                    textToSpeech.speak(objectName, TextToSpeech.QUEUE_FLUSH, null, null);
+//                }
             }
 
         }
@@ -259,9 +313,9 @@ public class objectDetectorClass {
         detectedObjects.clear();
     }
     public void releaseResources() {
-        if (textToSpeech != null) {
-            textToSpeech.stop();
-            textToSpeech.shutdown();
+        if (textToSpeech1 != null) {
+            textToSpeech1.stop();
+            textToSpeech1.shutdown();
         }
     }
 

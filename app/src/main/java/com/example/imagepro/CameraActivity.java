@@ -34,7 +34,7 @@ public class CameraActivity extends Activity implements CameraBridgeViewBase.CvC
     private static final String TAG="MainActivity";
     private SpeechRecognizer speechRecognizer;
     private Intent speechRecognizerIntent;
-    private boolean isListening = false;
+    private static boolean isListening = false;
     private static final int SPEECH_REQUEST_CODE = 100;
     private TextToSpeech textToSpeech;
     private Mat mRgba;
@@ -42,6 +42,9 @@ public class CameraActivity extends Activity implements CameraBridgeViewBase.CvC
     private CameraBridgeViewBase mOpenCvCameraView;
     private objectDetectorClass objectDetectorClass;
     private Button voice_button;
+    public static boolean check_button= false;
+    private boolean isReading = false;
+
     private void initSpeechRecognizer() {
         speechRecognizer = SpeechRecognizer.createSpeechRecognizer(this);
         speechRecognizerIntent = new Intent(RecognizerIntent.ACTION_RECOGNIZE_SPEECH);
@@ -154,9 +157,15 @@ public class CameraActivity extends Activity implements CameraBridgeViewBase.CvC
         voice_button = findViewById(R.id.voice_button);
         // Thiết lập sự kiện nhấn cho voice_button
         voice_button.setOnClickListener(new View.OnClickListener() {
+
             @Override
             public void onClick(View v) {
-               describeSurrounding();
+                if (!isListening) {
+                    isReading=true;
+                    describeSurrounding();
+                    check_button = true;
+                    isReading=false;
+                }
             }
         });
 
@@ -182,12 +191,21 @@ public class CameraActivity extends Activity implements CameraBridgeViewBase.CvC
     }
     // Nhận kết quả từ Google Speech Recognition
     private void describeSurrounding() {
+        if (textToSpeech != null) {
+            textToSpeech.stop(); // Dừng TTS hiện tại
+        }
         String detectedObjects = objectDetectorClass.getDetectedObjects(); // Hàm cần được triển khai
-        System.out.println(detectedObjects);
+        Log.d("DEBUG_TAG", "Detected objects: " + detectedObjects);
         textToSpeech.speak("I see " + detectedObjects, TextToSpeech.QUEUE_FLUSH, null, null);
         objectDetectorClass.clearDetectedObjects();
     }
 
+    public static boolean get_button_state() {
+        return check_button;
+    }
+    public static void set_button_state(boolean state) {
+        check_button = state;
+    }
     @Override
     protected void onResume() {
         super.onResume();
